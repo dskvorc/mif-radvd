@@ -1,3 +1,30 @@
+Makefile compilation:
+=============
+
+Prior to building and installation, configuration scripts for building,
+installing and packaging need to be generated. To generate the configuration
+scripts, the following tools have to be installed on your Linux box:
+
+    autoconf
+    autoheader
+    aclocal
+    automake
+
+If any of these tools is not available on your machine, install it using e.g.
+
+    sudo apt-get install autoconf
+
+To generate the configuration scripts, run the following commands in the order
+specified below:
+
+$ aclocal
+$ autoheader
+$ automake --add-missing
+$ autoconf
+
+Alternativelly, all of the above commands can be replaced by:
+
+$ autoreconf --install
 
 Installation:
 =============
