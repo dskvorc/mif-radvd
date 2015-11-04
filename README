@@ -1,5 +1,5 @@
 Makefile compilation:
-=============
+=====================
 
 Prior to building and installation, configuration scripts for building,
 installing, and packaging need to be generated. To generate the configuration
