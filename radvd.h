@@ -90,6 +90,7 @@ struct Interface {
 	struct AdvRoute *AdvRouteList;
 	struct AdvRDNSS *AdvRDNSSList;
 	struct AdvDNSSL *AdvDNSSLList;
+	struct AdvPvd *AdvPvdList;
 
 	uint32_t AdvLinkMTU; /* XXX: sllao also has an if_maxmtu value...Why? */
 
@@ -207,6 +208,20 @@ struct AdvAbro {
 	struct AdvAbro *next;
 };
 
+/* Options for PVD configuration */
+
+struct AdvPvd {
+	char pvdid[37];	/* UUID is used as PVD ID, the length is 32 hex digits + 4 hyphens */
+	struct AdvPrefix *AdvPrefixList;
+	struct AdvRoute *AdvRouteList;
+	struct AdvRDNSS *AdvRDNSSList;
+	struct AdvDNSSL *AdvDNSSLList;
+	struct AdvLowpanCo *AdvLowpanCoList;
+	struct AdvAbro *AdvAbroList;
+
+	struct AdvPvd *next;
+};
+
 /* Mobile IPv6 extensions */
 
 struct AdvInterval {
@@ -250,6 +265,22 @@ struct nd_opt_6co {
 	struct in6_addr nd_opt_6co_con_prefix;
 };				/*Added by Bhadram */
 
+#define ND_OPT_PVD	63
+#define PVD_OPT_ID	31
+
+struct nd_opt_pvd {
+	uint8_t nd_opt_pvd_type;
+	uint8_t nd_opt_pvd_len;
+	uint8_t nd_opt_pvd_s:1, :7; /* 1 bit for S flag, 7 bits for reserved field */
+	uint8_t nd_opt_pvd_nametype;
+	uint32_t nd_opt_pvd_padding;
+	uint8_t nd_opt_pvd_id_type;
+	uint8_t nd_opt_pvd_id_len;
+	uint8_t nd_opt_pvd_id_idtype;
+	uint8_t nd_opt_pvd_id_idlen;
+	char nd_opt_pvd_id_pvdid[36];
+};
+
 /* gram.y */
 struct Interface *readin_config(char const *fname);
 
@@ -289,6 +320,7 @@ void prefix_init_defaults(struct AdvPrefix *);
 void rdnss_init_defaults(struct AdvRDNSS *, struct Interface *);
 void reschedule_iface(struct Interface *iface, double next);
 void route_init_defaults(struct AdvRoute *, struct Interface *);
+void pvd_init_defaults(struct AdvPvd *);
 void touch_iface(struct Interface * iface);
 
 /* socket.c */

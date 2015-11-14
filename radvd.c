@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 	char const *conf_path = PATH_RADVD_CONF;
 	char const *daemon_pid_file_ident = PATH_RADVD_PID;
 
-    printf("radvd (%d): radvd %s started\n", getpid(), VERSION);
+	printf("radvd (%d): radvd %s started\n", getpid(), VERSION);
 
 	/* parse args */
 #define OPTIONS_STR "d:C:l:m:p:t:u:vhcn"
