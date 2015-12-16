@@ -30,11 +30,13 @@ number		({digit})+
 snum		-?({digit})+
 decimal		({number}"."{number})
 hexdigit	([a-f]|[A-F]|[0-9])
+lhexdigit	([a-f]|[0-9])
 addr1		{hexdigit}{1,4}":"({hexdigit}{1,4}":")*(":"{hexdigit}{1,4})+
 addr2		{hexdigit}{1,4}(":"{hexdigit}{1,4})*"::"
 addr3		({hexdigit}{1,4}":"){7}{hexdigit}{1,4}
 addr		({addr1}|{addr2}|{addr3}|"::")
 whitespace	([ \t])+
+uuid		{lhexdigit}{8}"-"({lhexdigit}{4}"-"){3}{lhexdigit}{12}
 string		[a-zA-Z0-9`~!@#$%\^&*()_\-+=:\[\]<>,\.?\\]+
 %%
 
@@ -50,6 +52,7 @@ DNSSL			{ return T_DNSSL; }
 clients			{ return T_CLIENTS; }
 lowpanco		{ return T_LOWPANCO; }
 abro			{ return T_ABRO; }
+pvd			{ return T_PVD; }
 
 IgnoreIfMissing		{ return T_IgnoreIfMissing; }
 AdvSendAdvert		{ return T_AdvSendAdvert; }
@@ -148,6 +151,16 @@ low		{ yylval.snum = -1; return SIGNEDNUMBER; }
 medium		{ yylval.snum = 0; return SIGNEDNUMBER; }
 
 high		{ yylval.snum = 1; return SIGNEDNUMBER; }
+
+{uuid}		{
+			/* Max length of UUID is 36: 32 hex digits + 4 hyphens */
+			static char uuid[37];
+
+			strncpy(uuid, yytext, sizeof(uuid));
+			uuid[sizeof(uuid)-1] = '\0';
+			yylval.str = uuid;
+			return UUID;
+		}
 
 {string}	{
 			static char string[256];

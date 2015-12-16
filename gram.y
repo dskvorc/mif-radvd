@@ -54,8 +54,10 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %token		T_CLIENTS
 %token		T_LOWPANCO
 %token		T_ABRO
+%token		T_PVD
 
 %token	<str>	STRING
+%token	<str>	UUID
 %token	<num>	NUMBER
 %token	<snum>	SIGNEDNUMBER
 %token	<dec>	DECIMAL
@@ -132,6 +134,7 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %type	<dnsslinfo> dnssldef
 %type   <lowpancoinfo> lowpancodef
 %type   <abroinfo> abrodef
+%type   <pvdinfo> pvddef
 %type   <num>	number_or_infinity
 
 %union {
@@ -147,6 +150,7 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 	struct Clients		*ainfo;
 	struct AdvLowpanCo	*lowpancoinfo;
 	struct AdvAbro		*abroinfo;
+	struct AdvPvd		*pvdinfo;
 };
 
 %{
@@ -160,6 +164,7 @@ static struct AdvRDNSS *rdnss;
 static struct AdvDNSSL *dnssl;
 static struct AdvLowpanCo *lowpanco;
 static struct AdvAbro  *abro;
+static struct AdvPvd  *pvd;
 static void cleanup(void);
 #define ABORT	do { cleanup(); YYABORT; } while (0);
 static void yyerror(char const * msg);
@@ -230,6 +235,7 @@ ifaceparam 	: ifaceval
 		| dnssldef 	{ ADD_TO_LL(struct AdvDNSSL, AdvDNSSLList, $1); }
 		| lowpancodef   { ADD_TO_LL(struct AdvLowpanCo, AdvLowpanCoList, $1); }
 		| abrodef       { ADD_TO_LL(struct AdvAbro, AdvAbroList, $1); }
+		| pvddef	{ ADD_TO_LL(struct AdvPvd, AdvPvdList, $1); }
 		;
 
 ifaceval	: T_MinRtrAdvInterval NUMBER ';'
@@ -361,6 +367,109 @@ v6addrlist	: IPV6ADDR ';'
 		}
 		;
 
+pvddef		: pvdhead '{' pvdparams '}' ';'
+		{
+			$$ = pvd;
+			pvd = NULL;
+		}
+		;
+
+pvdhead		: T_PVD UUID
+		{
+			pvd = malloc(sizeof(struct AdvPvd));
+
+			if (pvd == NULL) {
+				flog(LOG_CRIT, "malloc failed: %s", strerror(errno));
+				ABORT;
+			}
+
+			pvd_init_defaults(pvd);
+
+			if (sizeof(pvd->pvdid) < strlen($2) + 1) {
+				flog(LOG_CRIT, "PVD ID %s is too long", $2);
+				ABORT;
+			}
+			strncpy(pvd->pvdid, $2, strlen($2));
+		}
+		;
+
+pvdparams	: pvdparams pvdparam
+		| /* empty */
+		;
+
+pvdparam	: prefixdef
+		{
+			struct AdvPrefix *prefix = $1;
+			if (pvd->AdvPrefixList == NULL)
+				pvd->AdvPrefixList = prefix;
+			else {
+				struct AdvPrefix *current = pvd->AdvPrefixList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = prefix;
+			}
+		}
+		| routedef
+		{
+			struct AdvRoute *route = $1;
+			if (pvd->AdvRouteList == NULL)
+				pvd->AdvRouteList = route;
+			else {
+				struct AdvRoute *current = pvd->AdvRouteList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = route;
+			}
+		}
+		| rdnssdef
+		{
+			struct AdvRDNSS *rdnss = $1;
+			if (pvd->AdvRDNSSList == NULL)
+				pvd->AdvRDNSSList = rdnss;
+			else {
+				struct AdvRDNSS *current = pvd->AdvRDNSSList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = rdnss;
+			}
+		}
+		| dnssldef
+		{
+			struct AdvDNSSL *dnssl = $1;
+			if (pvd->AdvDNSSLList == NULL)
+				pvd->AdvDNSSLList = dnssl;
+			else {
+				struct AdvDNSSL *current = pvd->AdvDNSSLList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = dnssl;
+			}
+		}
+		| lowpancodef
+		{
+			struct AdvLowpanCo *lowpanco = $1;
+			if (pvd->AdvLowpanCoList == NULL)
+				pvd->AdvLowpanCoList = lowpanco;
+			else {
+				struct AdvLowpanCo *current = pvd->AdvLowpanCoList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = lowpanco;
+			}
+		}
+		| abrodef
+		{
+			struct AdvAbro *abro = $1;
+			if (pvd->AdvAbroList == NULL)
+				pvd->AdvAbroList = abro;
+			else {
+				struct AdvAbro *current = pvd->AdvAbroList;
+				while (current->next != NULL)
+					current = current->next;
+				current->next = abro;
+			}
+		}
+		;
 
 prefixdef	: prefixhead optional_prefixplist ';'
 		{
@@ -1110,6 +1219,11 @@ static void cleanup(void)
 	if (abro) {
 		free(abro);
 		abro = 0;
+	}
+
+	if (pvd) {
+		free(pvd);
+		pvd = 0;
 	}
 }
 

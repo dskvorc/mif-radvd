@@ -26,17 +26,18 @@ static void decrement_lifetime(const time_t secs, uint32_t * lifetime);
 static void update_iface_times(struct Interface * iface);
 
 static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const * ra_header_info, int cease_adv);
-static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const * prefix, int cease_adv);
-static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv);
-static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv);
+static size_t add_prefix(struct safe_buffer * sb, struct AdvPrefix const * prefix, int cease_adv);
+static size_t add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv);
+static size_t add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv);
 static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl);
-static void add_dnssl(struct safe_buffer * sb, struct AdvDNSSL const *dnssl, int cease_adv);
+static size_t add_dnssl(struct safe_buffer * sb, struct AdvDNSSL const *dnssl, int cease_adv);
+static void add_pvd(struct safe_buffer * sb, struct AdvPvd const * pvd, int cease_adv);
 static void add_mtu(struct safe_buffer * sb, uint32_t AdvLinkMTU);
 static void add_sllao(struct safe_buffer * sb, struct sllao const *sllao);
 static void add_mipv6_rtr_adv_interval(struct safe_buffer * sb, double MaxRtrAdvInterval);
 static void add_mipv6_home_agent_info(struct safe_buffer * sb, struct mipv6 const * mipv6);
-static void add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco);
-static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
+static size_t add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco);
+static size_t add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo);
 
 #ifdef UNIT_TEST
 #include "test/send.c"
@@ -191,8 +192,9 @@ static void add_ra_header(struct safe_buffer * sb, struct ra_header_info const *
 	safe_buffer_append(sb, &radvert, sizeof(radvert));
 }
 
-static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, int cease_adv)
+static size_t add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, int cease_adv)
 {
+	size_t total_len = 0;
 	while (prefix) {
 		if (prefix->enabled && (!prefix->DecrementLifetimesFlag || prefix->curr_preferredlft > 0)) {
 			struct nd_opt_prefix_info pinfo;
@@ -201,6 +203,7 @@ static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, 
 
 			pinfo.nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
 			pinfo.nd_opt_pi_len = 4;
+			total_len += pinfo.nd_opt_pi_len;
 			pinfo.nd_opt_pi_prefix_len = prefix->PrefixLen;
 
 			pinfo.nd_opt_pi_flags_reserved = (prefix->AdvOnLinkFlag) ? ND_OPT_PI_FLAG_ONLINK : 0;
@@ -228,8 +231,101 @@ static void add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix, 
 
 		prefix = prefix->next;
 	}
+	return total_len;
 }
 
+static void add_pvd(struct safe_buffer * sb, struct AdvPvd const *pvd, int cease_adv)
+{
+	while (pvd) {
+		/* create a temporary buffer to write the encapsulated options to
+		   until we calculate the total length of the outer PVD_CO option */
+		size_t total_len = 0;
+		struct safe_buffer pvd_sb = SAFE_BUFFER_INIT;
+
+		printf("PVD INFO: pvdid=%s\n", pvd->pvdid);
+		struct AdvPrefix *prefix = pvd->AdvPrefixList;
+		while (prefix) {
+			char pfx_str[INET6_ADDRSTRLEN];
+			addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+			printf("	PVD PREFIX INFO: prefix=%s, prefixlen=%d\n", pfx_str, prefix->PrefixLen);
+			prefix = prefix->next;
+		}
+
+		struct nd_opt_pvd pvdinfo;
+		memset(&pvdinfo, 0, sizeof(pvdinfo));
+
+		/* create PVD_CO container option */
+		pvdinfo.nd_opt_pvd_type = ND_OPT_PVD;
+		/* initial length of PVD_CO option without encapsulated options */
+		pvdinfo.nd_opt_pvd_len = 1;
+		total_len += pvdinfo.nd_opt_pvd_len;
+		pvdinfo.nd_opt_pvd_s = 0;
+		pvdinfo.nd_opt_pvd_nametype = 0;
+
+		/* add PVD_ID option */
+		pvdinfo.nd_opt_pvd_id_type = PVD_OPT_ID;
+		pvdinfo.nd_opt_pvd_id_len = 5;
+		total_len += pvdinfo.nd_opt_pvd_id_len;
+		pvdinfo.nd_opt_pvd_id_idtype = 4;
+		pvdinfo.nd_opt_pvd_id_idlen = 36;
+		memcpy(&pvdinfo.nd_opt_pvd_id_pvdid, pvd->pvdid, sizeof(pvdinfo.nd_opt_pvd_id_pvdid));;
+
+		/* add encapsulated ND options if specified */
+		if (pvd->AdvPrefixList) {
+			total_len += add_prefix(&pvd_sb, pvd->AdvPrefixList, cease_adv);
+		}
+
+		if (pvd->AdvRouteList) {
+			total_len += add_route(&pvd_sb, pvd->AdvRouteList, cease_adv);
+		}
+
+		if (pvd->AdvRDNSSList) {
+			total_len += add_rdnss(&pvd_sb, pvd->AdvRDNSSList, cease_adv);
+		}
+
+		if (pvd->AdvDNSSLList) {
+			total_len += add_dnssl(&pvd_sb, pvd->AdvDNSSLList, cease_adv);
+		}
+
+		/*
+		if (iface->AdvLinkMTU != 0) {
+			add_mtu(sb, iface->AdvLinkMTU);
+		}
+
+		if (iface->AdvSourceLLAddress && iface->sllao.if_hwaddr_len > 0) {
+			add_sllao(sb, &iface->sllao);
+		}
+
+		if (iface->mipv6.AdvIntervalOpt) {
+			add_mipv6_rtr_adv_interval(sb, iface->MaxRtrAdvInterval);
+		}
+
+		if (iface->mipv6.AdvHomeAgentInfo
+		    && (iface->mipv6.AdvMobRtrSupportFlag || iface->mipv6.HomeAgentPreference != 0
+			|| iface->mipv6.HomeAgentLifetime != iface->ra_header_info.AdvDefaultLifetime)) {
+			add_mipv6_home_agent_info(sb, &iface->mipv6);
+		}
+		*/
+
+		if (pvd->AdvLowpanCoList) {
+			total_len += add_lowpanco(&pvd_sb, pvd->AdvLowpanCoList);
+		}
+
+		if (pvd->AdvAbroList) {
+			total_len += add_abro(&pvd_sb, pvd->AdvAbroList);
+		}
+
+		/* write out PVD_CO container option + PVD_ID option */
+		pvdinfo.nd_opt_pvd_len = total_len;
+		safe_buffer_append(sb, &pvdinfo, sizeof(pvdinfo));
+		/* write out encapsulated ND options */
+		safe_buffer_append(sb, pvd_sb.buffer, pvd_sb.used);
+		/* destroy a temporary buffer */
+		safe_buffer_free(&pvd_sb);
+
+		pvd = pvd->next;
+	}
+}
 
 
 /* *INDENT-OFF* */
@@ -285,8 +381,9 @@ static size_t serialize_domain_names(struct safe_buffer * safe_buffer, struct Ad
 	return len;
 }
 
-static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv)
+static size_t add_route(struct safe_buffer * sb, struct AdvRoute const *route, int cease_adv)
 {
+	size_t total_len = 0;
 	while (route) {
 		struct nd_opt_route_info_local rinfo;
 
@@ -295,6 +392,7 @@ static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int
 		rinfo.nd_opt_ri_type = ND_OPT_ROUTE_INFORMATION;
 		/* XXX: the prefixes are allowed to be sent in smaller chunks as well */
 		rinfo.nd_opt_ri_len = 3;
+		total_len += rinfo.nd_opt_ri_len;
 		rinfo.nd_opt_ri_prefix_len = route->PrefixLen;
 
 		rinfo.nd_opt_ri_flags_reserved = (route->AdvRoutePreference << ND_OPT_RI_PRF_SHIFT) & ND_OPT_RI_PRF_MASK;
@@ -310,10 +408,12 @@ static void add_route(struct safe_buffer * sb, struct AdvRoute const *route, int
 
 		route = route->next;
 	}
+	return total_len;
 }
 
-static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv)
+static size_t add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int cease_adv)
 {
+	size_t total_len = 0;
 	while (rdnss) {
 		struct nd_opt_rdnss_info_local rdnssinfo;
 
@@ -321,6 +421,7 @@ static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int
 
 		rdnssinfo.nd_opt_rdnssi_type = ND_OPT_RDNSS_INFORMATION;
 		rdnssinfo.nd_opt_rdnssi_len = 1 + 2 * rdnss->AdvRDNSSNumber;
+		total_len += rdnssinfo.nd_opt_rdnssi_len;
 		rdnssinfo.nd_opt_rdnssi_pref_flag_reserved = 0;
 
 		if (cease_adv && rdnss->FlushRDNSSFlag) {
@@ -337,10 +438,12 @@ static void add_rdnss(struct safe_buffer * sb, struct AdvRDNSS const *rdnss, int
 
 		rdnss = rdnss->next;
 	}
+	return total_len;
 }
 
-static void add_dnssl(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl, int cease_adv)
+static size_t add_dnssl(struct safe_buffer * safe_buffer, struct AdvDNSSL const *dnssl, int cease_adv)
 {
+	size_t total_len = 0;
 	while (dnssl) {
 
 		/* *INDENT-OFF* */
@@ -408,6 +511,7 @@ static void add_dnssl(struct safe_buffer * safe_buffer, struct AdvDNSSL const *d
 		
 		dnsslinfo.nd_opt_dnssli_type = ND_OPT_DNSSL_INFORMATION;
 		dnsslinfo.nd_opt_dnssli_len = (bytes + 7) / 8;
+		total_len += dnsslinfo.nd_opt_dnssli_len;
 		dnsslinfo.nd_opt_dnssli_reserved = 0;
 
 		if (cease_adv && dnssl->FlushDNSSLFlag) {
@@ -424,8 +528,7 @@ static void add_dnssl(struct safe_buffer * safe_buffer, struct AdvDNSSL const *d
 
 		dnssl = dnssl->next;
 	}
-
-
+	return total_len;
 }
 
 /*
@@ -540,14 +643,16 @@ static void add_mipv6_home_agent_info(struct safe_buffer * sb, struct mipv6 cons
 /*
  * Add 6co option
  */
-static void add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco)
+static size_t add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowpanco)
 {
+	size_t total_len = 0;
 	struct nd_opt_6co co;
 
 	memset(&co, 0, sizeof(co));
 
 	co.nd_opt_6co_type = ND_OPT_6CO;
 	co.nd_opt_6co_len = 3;
+	total_len += co.nd_opt_6co_len;
 	co.nd_opt_6co_context_len = lowpanco->ContextLength;
 	co.nd_opt_6co_c = lowpanco->ContextCompressionFlag;
 	co.nd_opt_6co_cid = lowpanco->AdvContextID;
@@ -555,22 +660,26 @@ static void add_lowpanco(struct safe_buffer * sb, struct AdvLowpanCo const *lowp
 	co.nd_opt_6co_con_prefix = lowpanco->AdvContextPrefix;
 
 	safe_buffer_append(sb, &co, sizeof(co));
+	return total_len;
 }
 
-static void add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo)
+static size_t add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo)
 {
+	size_t total_len = 0;
 	struct nd_opt_abro abro;
 
 	memset(&abro, 0, sizeof(abro));
 
 	abro.nd_opt_abro_type = ND_OPT_ABRO;
 	abro.nd_opt_abro_len = 3;
+	total_len += abro.nd_opt_abro_len;
 	abro.nd_opt_abro_ver_low = abroo->Version[1];
 	abro.nd_opt_abro_ver_high = abroo->Version[0];
 	abro.nd_opt_abro_valid_lifetime = abroo->ValidLifeTime;
 	abro.nd_opt_abro_6lbr_address = abroo->LBRaddress;
 
 	safe_buffer_append(sb, &abro, sizeof(abro));
+	return total_len;
 }
 
 
@@ -592,6 +701,10 @@ static void build_ra(struct safe_buffer * sb, struct Interface const * iface)
 
 	if (iface->AdvDNSSLList) {
 		add_dnssl(sb, iface->AdvDNSSLList, iface->state_info.cease_adv);
+	}
+
+	if (iface->AdvPvdList) {
+		add_pvd(sb, iface->AdvPvdList, iface->state_info.cease_adv);
 	}
 
 	if (iface->AdvLinkMTU != 0) {

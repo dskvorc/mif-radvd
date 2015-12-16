@@ -145,6 +145,11 @@ void dnssl_init_defaults(struct AdvDNSSL *dnssl, struct Interface *iface)
 	dnssl->FlushDNSSLFlag = DFLT_FlushDNSSLFlag;
 }
 
+void pvd_init_defaults(struct AdvPvd *pvd)
+{
+	memset(pvd, 0, sizeof(struct AdvPvd));
+}
+
 int check_iface(struct Interface *iface)
 {
 	int res = 0;
@@ -342,6 +347,65 @@ void for_each_iface(struct Interface *ifaces, void (*foo) (struct Interface *, v
 	}
 }
 
+static void free_pvd_params(struct AdvPvd *pvd)
+{
+	if (pvd) {
+		dlog(LOG_DEBUG, 4, "freeing PVD %s", pvd->pvdid);
+
+		struct AdvPrefix *prefix = pvd->AdvPrefixList;
+		while (prefix) {
+			struct AdvPrefix *next_prefix = prefix->next;
+
+			free(prefix);
+			prefix = next_prefix;
+		}
+
+		struct AdvRoute *route = pvd->AdvRouteList;
+		while (route) {
+			struct AdvRoute *next_route = route->next;
+
+			free(route);
+			route = next_route;
+		}
+
+		struct AdvRDNSS *rdnss = pvd->AdvRDNSSList;
+		while (rdnss) {
+			struct AdvRDNSS *next_rdnss = rdnss->next;
+
+			free(rdnss);
+			rdnss = next_rdnss;
+		}
+
+		struct AdvDNSSL *dnssl = pvd->AdvDNSSLList;
+		while (dnssl) {
+			struct AdvDNSSL *next_dnssl = dnssl->next;
+
+			for (int i = 0; i < dnssl->AdvDNSSLNumber; i++)
+				free(dnssl->AdvDNSSLSuffixes[i]);
+			free(dnssl->AdvDNSSLSuffixes);
+			free(dnssl);
+
+			dnssl = next_dnssl;
+		}
+
+		struct AdvLowpanCo *lowpanco = pvd->AdvLowpanCoList;
+		while (lowpanco) {
+			struct AdvLowpanCo *next_lowpanco = lowpanco->next;
+
+			free(lowpanco);
+			lowpanco = next_lowpanco;
+		}
+
+		struct AdvAbro *abro = pvd->AdvAbroList;
+		while (abro) {
+			struct AdvAbro *next_abro = abro->next;
+
+			free(abro);
+			abro = next_abro;
+		}
+	}
+}
+
 static void free_iface_list(struct Interface *iface)
 {
 	while (iface) {
@@ -383,6 +447,15 @@ static void free_iface_list(struct Interface *iface)
 			free(dnssl);
 
 			dnssl = next_dnssl;
+		}
+
+		struct AdvPvd *pvd = iface->AdvPvdList;
+		while (pvd) {
+			struct AdvPvd *next_pvd = pvd->next;
+
+			free_pvd_params(pvd);
+			free(pvd);
+			pvd = next_pvd;
 		}
 
 		struct Clients *clients = iface->ClientList;
