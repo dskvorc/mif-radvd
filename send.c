@@ -255,7 +255,7 @@ static void add_pvd(struct safe_buffer * sb, struct AdvPvd const *pvd, int cease
 		memset(&pvdinfo, 0, sizeof(pvdinfo));
 
 		/* create PVD_CO container option */
-		pvdinfo.nd_opt_pvd_type = ND_OPT_PVD;
+		pvdinfo.nd_opt_pvd_type = ND_OPT_PVD_CONTAINER;
 		/* initial length of PVD_CO option without encapsulated options */
 		pvdinfo.nd_opt_pvd_len = 1;
 		total_len += pvdinfo.nd_opt_pvd_len;
@@ -263,7 +263,7 @@ static void add_pvd(struct safe_buffer * sb, struct AdvPvd const *pvd, int cease
 		pvdinfo.nd_opt_pvd_nametype = 0;
 
 		/* add PVD_ID option */
-		pvdinfo.nd_opt_pvd_id_type = PVD_OPT_ID;
+		pvdinfo.nd_opt_pvd_id_type = ND_OPT_PVD_ID;
 		pvdinfo.nd_opt_pvd_id_len = 5;
 		total_len += pvdinfo.nd_opt_pvd_id_len;
 		pvdinfo.nd_opt_pvd_id_idtype = 4;

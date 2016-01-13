@@ -265,8 +265,8 @@ struct nd_opt_6co {
 	struct in6_addr nd_opt_6co_con_prefix;
 };				/*Added by Bhadram */
 
-#define ND_OPT_PVD	63
-#define PVD_OPT_ID	31
+#define ND_OPT_PVD_CONTAINER    63
+#define ND_OPT_PVD_ID           64
 
 struct nd_opt_pvd {
 	uint8_t nd_opt_pvd_type;
