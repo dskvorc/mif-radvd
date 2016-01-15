@@ -135,7 +135,7 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %type   <lowpancoinfo> lowpancodef
 %type   <abroinfo> abrodef
 %type	<pvdinfo> pvddef
-%type <num> number_or_infinity
+%type   <num>	number_or_infinity
 
 %union {
 	unsigned int		num;
