@@ -132,10 +132,10 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %type	<rinfo>	routedef
 %type	<rdnssinfo> rdnssdef
 %type	<dnsslinfo> dnssldef
-%type	<lowpancoinfo> lowpancodef
-%type	<abroinfo> abrodef
+%type	<lowpancoinfo>	lowpancodef
+%type	<abroinfo>	abrodef
 %type	<pvdinfo> pvddef
-%type	<num> number_or_infinity
+%type	<num>	number_or_infinity
 
 %union {
 	unsigned int		num;
