@@ -135,7 +135,7 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %type   <lowpancoinfo> lowpancodef
 %type   <abroinfo> abrodef
 %type	<pvdinfo> pvddef
-%type	<num>	number_or_infinity
+%type <num> number_or_infinity
 
 %union {
 	unsigned int		num;
@@ -163,7 +163,7 @@ static struct AdvRoute *route;
 static struct AdvRDNSS *rdnss;
 static struct AdvDNSSL *dnssl;
 static struct AdvLowpanCo *lowpanco;
-static struct AdvAbro *abro;
+static struct AdvAbro  *abro;
 static struct AdvPvd *pvd;
 static void cleanup(void);
 #define ABORT	do { cleanup(); YYABORT; } while (0);
