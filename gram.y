@@ -127,8 +127,8 @@ static struct in6_addr get_prefix6(struct in6_addr const *addr, struct in6_addr 
 %token		T_BAD_TOKEN
 
 %type	<str>	name
-%type	<pinfo>	prefixdef
-%type	<ainfo>	clientslist v6addrlist
+%type	<pinfo> prefixdef
+%type	<ainfo> clientslist v6addrlist
 %type	<rinfo>	routedef
 %type	<rdnssinfo>	rdnssdef
 %type	<dnsslinfo>	dnssldef
