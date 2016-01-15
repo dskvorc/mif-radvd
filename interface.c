@@ -17,7 +17,7 @@
 #include "radvd.h"
 #include "defaults.h"
 
-#define IFACE_SETUP_DELAY	1
+#define IFACE_SETUP_DELAY	10
 
 void iface_init_defaults(struct Interface *iface)
 {
