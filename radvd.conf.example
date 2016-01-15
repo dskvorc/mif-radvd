@@ -119,6 +119,46 @@ interface eth0
                 AdvDNSSLLifetime 30;
         };
 
+#
+# Explicitly identified provisioning domain (PvD) as defined in
+#     RFC 6418 (https://tools.ietf.org/wg/mif/draft-ietf-mif-problem-statement/),
+#     RFC 7556 (https://tools.ietf.org/wg/mif/draft-ietf-mif-mpvd-arch/),
+#     draft-ietf-mif-mpvd-ndp-support (https://tools.ietf.org/wg/mif/draft-ietf-mif-mpvd-ndp-support/), and
+#     draft-ietf-mif-mpvd-id (https://tools.ietf.org/wg/mif/draft-ietf-mif-mpvd-id/).
+# UUID string is used as PvD identifier. Multiple pvd blocks are allowed per
+# interface block, as long as they use unique identifier.
+#
+	pvd f5a7f97d-ba83-4fd8-a3e0-839b2c2446ca
+	{
 
+#
+# Inside the pvd block, the following blocks may be defined:
+# prefix, route, RDNSS, DNSSL, LoWPANCo, ABRO
+# using the same sintax as if they were defined in interface-level block.
+# For example:
+#
+		prefix 0:0:0:1234::/64
+		{
+			AdvOnLink on;
+			AdvAutonomous on;
+			AdvRouterAddr off;
+		};
+
+		route 2001:db0:fff::/48
+		{
+			AdvRoutePreference high;
+			AdvRouteLifetime 3600;
+		};
+
+		RDNSS 2001:db8::1 2001:db8::2
+		{
+			AdvRDNSSLifetime 30;
+		};
+
+		DNSSL branch.example.com example.com
+		{
+			AdvDNSSLLifetime 30;
+		};
+	};
 };
 
