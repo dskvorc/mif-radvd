@@ -234,100 +234,6 @@ static size_t add_prefix(struct safe_buffer * sb, struct AdvPrefix const *prefix
 	return total_len;
 }
 
-static void add_pvd(struct safe_buffer * sb, struct AdvPvd const *pvd, int cease_adv)
-{
-	while (pvd) {
-		/* create a temporary buffer to write the encapsulated options to
-		   until we calculate the total length of the outer PVD_CO option */
-		size_t total_len = 0;
-		struct safe_buffer pvd_sb = SAFE_BUFFER_INIT;
-
-		printf("PVD INFO: pvdid=%s\n", pvd->pvdid);
-		struct AdvPrefix *prefix = pvd->AdvPrefixList;
-		while (prefix) {
-			char pfx_str[INET6_ADDRSTRLEN];
-			addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
-			printf("	PVD PREFIX INFO: prefix=%s, prefixlen=%d\n", pfx_str, prefix->PrefixLen);
-			prefix = prefix->next;
-		}
-
-		struct nd_opt_pvd pvdinfo;
-		memset(&pvdinfo, 0, sizeof(pvdinfo));
-
-		/* create PVD_CO container option */
-		pvdinfo.nd_opt_pvd_type = ND_OPT_PVD_CONTAINER;
-		/* initial length of PVD_CO option without encapsulated options */
-		pvdinfo.nd_opt_pvd_len = 1;
-		total_len += pvdinfo.nd_opt_pvd_len;
-		pvdinfo.nd_opt_pvd_s = 0;
-		pvdinfo.nd_opt_pvd_nametype = 0;
-
-		/* add PVD_ID option */
-		pvdinfo.nd_opt_pvd_id_type = ND_OPT_PVD_ID;
-		pvdinfo.nd_opt_pvd_id_len = 5;
-		total_len += pvdinfo.nd_opt_pvd_id_len;
-		pvdinfo.nd_opt_pvd_id_idtype = 4;
-		pvdinfo.nd_opt_pvd_id_idlen = 36;
-		memcpy(&pvdinfo.nd_opt_pvd_id_pvdid, pvd->pvdid, sizeof(pvdinfo.nd_opt_pvd_id_pvdid));;
-
-		/* add encapsulated ND options if specified */
-		if (pvd->AdvPrefixList) {
-			total_len += add_prefix(&pvd_sb, pvd->AdvPrefixList, cease_adv);
-		}
-
-		if (pvd->AdvRouteList) {
-			total_len += add_route(&pvd_sb, pvd->AdvRouteList, cease_adv);
-		}
-
-		if (pvd->AdvRDNSSList) {
-			total_len += add_rdnss(&pvd_sb, pvd->AdvRDNSSList, cease_adv);
-		}
-
-		if (pvd->AdvDNSSLList) {
-			total_len += add_dnssl(&pvd_sb, pvd->AdvDNSSLList, cease_adv);
-		}
-
-		/*
-		if (iface->AdvLinkMTU != 0) {
-			add_mtu(sb, iface->AdvLinkMTU);
-		}
-
-		if (iface->AdvSourceLLAddress && iface->sllao.if_hwaddr_len > 0) {
-			add_sllao(sb, &iface->sllao);
-		}
-
-		if (iface->mipv6.AdvIntervalOpt) {
-			add_mipv6_rtr_adv_interval(sb, iface->MaxRtrAdvInterval);
-		}
-
-		if (iface->mipv6.AdvHomeAgentInfo
-		    && (iface->mipv6.AdvMobRtrSupportFlag || iface->mipv6.HomeAgentPreference != 0
-			|| iface->mipv6.HomeAgentLifetime != iface->ra_header_info.AdvDefaultLifetime)) {
-			add_mipv6_home_agent_info(sb, &iface->mipv6);
-		}
-		*/
-
-		if (pvd->AdvLowpanCoList) {
-			total_len += add_lowpanco(&pvd_sb, pvd->AdvLowpanCoList);
-		}
-
-		if (pvd->AdvAbroList) {
-			total_len += add_abro(&pvd_sb, pvd->AdvAbroList);
-		}
-
-		/* write out PVD_CO container option + PVD_ID option */
-		pvdinfo.nd_opt_pvd_len = total_len;
-		safe_buffer_append(sb, &pvdinfo, sizeof(pvdinfo));
-		/* write out encapsulated ND options */
-		safe_buffer_append(sb, pvd_sb.buffer, pvd_sb.used);
-		/* destroy a temporary buffer */
-		safe_buffer_free(&pvd_sb);
-
-		pvd = pvd->next;
-	}
-}
-
-
 /* *INDENT-OFF* */
 /*
  * Domain Names of DNS Search List
@@ -682,6 +588,96 @@ static size_t add_abro(struct safe_buffer * sb, struct AdvAbro const *abroo)
 	return total_len;
 }
 
+static void add_pvd(struct safe_buffer * sb, struct AdvPvd const *pvd, int cease_adv)
+{
+	while (pvd) {
+		/* create a temporary buffer to write the encapsulated options to
+		   until we calculate the total length of the outer PVD_CO option */
+		size_t total_len = 0;
+		struct safe_buffer pvd_sb = SAFE_BUFFER_INIT;
+
+		struct AdvPrefix *prefix = pvd->AdvPrefixList;
+		while (prefix) {
+			char pfx_str[INET6_ADDRSTRLEN];
+			addrtostr(&prefix->Prefix, pfx_str, sizeof(pfx_str));
+			prefix = prefix->next;
+		}
+
+		struct nd_opt_pvd pvdinfo;
+		memset(&pvdinfo, 0, sizeof(pvdinfo));
+
+		/* create PVD_CO container option */
+		pvdinfo.nd_opt_pvd_container_type = ND_OPT_PVD_CONTAINER;
+		/* initial length of PVD_CO option without encapsulated options */
+		pvdinfo.nd_opt_pvd_container_len = 1;
+		total_len += pvdinfo.nd_opt_pvd_container_len;
+		pvdinfo.nd_opt_pvd_container_s = 0;
+		pvdinfo.nd_opt_pvd_container_nametype = 0;
+
+		/* add PVD_ID option */
+		pvdinfo.nd_opt_pvd_id_type = ND_OPT_PVD_ID;
+		pvdinfo.nd_opt_pvd_id_len = 5;
+		total_len += pvdinfo.nd_opt_pvd_id_len;
+		pvdinfo.nd_opt_pvd_id_idtype = 4;
+		pvdinfo.nd_opt_pvd_id_idlen = 36;
+		memcpy(&pvdinfo.nd_opt_pvd_id_pvdid, pvd->pvdid, sizeof(pvdinfo.nd_opt_pvd_id_pvdid));;
+
+		/* add encapsulated ND options if specified */
+		if (pvd->AdvPrefixList) {
+			total_len += add_prefix(&pvd_sb, pvd->AdvPrefixList, cease_adv);
+		}
+
+		if (pvd->AdvRouteList) {
+			total_len += add_route(&pvd_sb, pvd->AdvRouteList, cease_adv);
+		}
+
+		if (pvd->AdvRDNSSList) {
+			total_len += add_rdnss(&pvd_sb, pvd->AdvRDNSSList, cease_adv);
+		}
+
+		if (pvd->AdvDNSSLList) {
+			total_len += add_dnssl(&pvd_sb, pvd->AdvDNSSLList, cease_adv);
+		}
+
+		/*
+		if (iface->AdvLinkMTU != 0) {
+			add_mtu(sb, iface->AdvLinkMTU);
+		}
+
+		if (iface->AdvSourceLLAddress && iface->sllao.if_hwaddr_len > 0) {
+			add_sllao(sb, &iface->sllao);
+		}
+
+		if (iface->mipv6.AdvIntervalOpt) {
+			add_mipv6_rtr_adv_interval(sb, iface->MaxRtrAdvInterval);
+		}
+
+		if (iface->mipv6.AdvHomeAgentInfo
+		    && (iface->mipv6.AdvMobRtrSupportFlag || iface->mipv6.HomeAgentPreference != 0
+			|| iface->mipv6.HomeAgentLifetime != iface->ra_header_info.AdvDefaultLifetime)) {
+			add_mipv6_home_agent_info(sb, &iface->mipv6);
+		}
+		*/
+
+		if (pvd->AdvLowpanCoList) {
+			total_len += add_lowpanco(&pvd_sb, pvd->AdvLowpanCoList);
+		}
+
+		if (pvd->AdvAbroList) {
+			total_len += add_abro(&pvd_sb, pvd->AdvAbroList);
+		}
+
+		/* write out PVD_CO container option + PVD_ID option */
+		pvdinfo.nd_opt_pvd_container_len = total_len;
+		safe_buffer_append(sb, &pvdinfo, sizeof(pvdinfo));
+		/* write out encapsulated ND options */
+		safe_buffer_append(sb, pvd_sb.buffer, pvd_sb.used);
+		/* destroy a temporary buffer */
+		safe_buffer_free(&pvd_sb);
+
+		pvd = pvd->next;
+	}
+}
 
 static void build_ra(struct safe_buffer * sb, struct Interface const * iface)
 {

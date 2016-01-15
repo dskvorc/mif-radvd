@@ -269,11 +269,11 @@ struct nd_opt_6co {
 #define ND_OPT_PVD_ID           64
 
 struct nd_opt_pvd {
-	uint8_t nd_opt_pvd_type;
-	uint8_t nd_opt_pvd_len;
-	uint8_t nd_opt_pvd_s:1, :7; /* 1 bit for S flag, 7 bits for reserved field */
-	uint8_t nd_opt_pvd_nametype;
-	uint32_t nd_opt_pvd_padding;
+	uint8_t nd_opt_pvd_container_type;
+	uint8_t nd_opt_pvd_container_len;
+	uint8_t nd_opt_pvd_container_s:1, :7; /* 1 bit for S flag, 7 bits for reserved field */
+	uint8_t nd_opt_pvd_container_nametype;
+	uint32_t nd_opt_pvd_container_padding;
 	uint8_t nd_opt_pvd_id_type;
 	uint8_t nd_opt_pvd_id_len;
 	uint8_t nd_opt_pvd_id_idtype;
